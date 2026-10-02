@@ -1,21 +1,279 @@
 # bridge-sdk-unity (C#)
 
-Deferred deep linking for Unity games. Part of [Bridge](../). The match signature
-is a C# port kept in lockstep with the server + every other SDK via
-[`shared-spec`](../shared-spec) golden vectors (run by `dotnet test` in CI).
-C# int overflow is wrapped with `unchecked` to match JS's 32-bit `|0`.
+Deep links and deferred deep links for Unity games. Part of [Bridge](../).
+Version **0.3.0**. It is at parity with the React Native reference SDK
+([`shared-spec/SDK-CONTRACT.md`](../shared-spec/SDK-CONTRACT.md)).
 
-> ⚠️ The signature core (`Bridge.Signature`) is CI-verified against the golden
-> vectors via dotnet. The Unity-runtime wrapper (UnityWebRequest, Screen/SystemInfo
-> device fields) needs the Unity editor to verify and is documented, not bundled.
+The library is plain C# (`netstandard2.1`) with **no UnityEngine dependency**, so
+`dotnet test` in CI checks it against the shared golden vectors
+(`test/test-vectors.json` and `test/conformance-vectors.json`). The game connects it to
+Unity's APIs, as shown below. It has no third-party DLLs: JSON is handled by a small
+built-in writer and parser (`BridgeJson`).
 
-## Use (sketch)
+> ⚠️ The library is CI-verified with dotnet. The Unity glue below (MonoBehaviour,
+> PlayerPrefs, AndroidJavaObject, iOS plugin, UnityWebRequest) has not been run in the
+> Unity editor or on a device. It is a documented sketch: check it on real devices
+> before you ship.
+
+## Contract coverage
+
+| # | Behaviour | Status |
+|---|---|---|
+| B1 | `publishableKey` in every body (`/v1/match`, `/v1/referrer`, `/v1/resolve`, `/v1/event`, `/v1/debug/fingerprint`) | ✓ |
+| B2 | `BridgeCore.BrowserScreenWidth` = `ceil(w - 0.001)` | ✓ (the game supplies the width, see below) |
+| B3 | Short-link hosts (endpoint + `LinkHosts`, via `NormalizeLinkHosts`) → `POST /v1/resolve {publishableKey,url,platform}` | ✓ |
+| B4 | `ClassifyUrl` (custom scheme → `https://host/path?q`) | ✓ |
+| B5 | `closed` for the launch URL, else `AppStateTracker` (2000 / 1000 ms) | ✓ |
+| B6 | Deferred check once per install (`bridge.deferredChecked`), skipped but marked when launched by a link | ✓ |
+| B7 | Android: referrer `bridge_link` → `/v1/referrer`, else or on a miss → `/v1/match` | ✓ (the game supplies the referrer) |
+| B8 | iOS: `/v1/match` with device fields | ✓ |
+| B9 | One `LinkEvent` type, replayed to late `OnLink` subscribers; `OnLinkStart` with the same id | ✓ |
+| B10 | Never throws; network failure → `matched:false, reason:"network"` | ✓ |
+| B11 | All JSON goes through an escaping writer | ✓ |
+| B12 | `SplitUrl` matches the vectors exactly (no `System.Uri`) | ✓ |
+| B13 | `TrackEvent`, `ReportFingerprint` (origin `app`), `CompareFingerprint` | ✓ |
+
+## Install
+
+Requires Unity 2021.2+ with **Api Compatibility Level = .NET Standard 2.1**. Copy
+`src/*.cs` into your project (for example `Assets/Bridge/`). Do not copy the `.csproj`.
+You can also build `src/Bridge.Signature.csproj` and drop the DLL into `Assets/Plugins/`.
+The assembly name `Bridge.Signature` is historical. Everything is in namespace `Bridge`.
+
+**Publishable key:** Dashboard → Get started → Publishable key (`bk_pub_live_…`). It is
+safe to put in your app. Never put your secret key (`bk_live_…`) in an app.
+
+## Wire it into a game
 
 ```csharp
-var sig = Bridge.BridgeSignature.Compute(Screen.width, screenScale, lang, ip, tz);
-// POST { publishableKey, platform:"ios"/"android", screenWidth, pixelRatio, language, timezone }
-// to {endpoint}/v1/match via UnityWebRequest; route to result.longUrl
+using System;
+using System.Threading.Tasks;
+using Bridge;
+using UnityEngine;
+
+public class BridgeLinks : MonoBehaviour
+{
+    public static BridgeClient Client { get; private set; }
+
+    async void Start()
+    {
+        DontDestroyOnLoad(gameObject);
+        Client = new BridgeClient(new BridgeConfig
+        {
+            PublishableKey = "bk_pub_live_…",
+            Endpoint = "https://bridge-redirect-engine.onrender.com",
+            LinkHosts = { "go.yourbrand.com" },          // custom domains, if any
+            Storage = new PlayerPrefsStore(),
+            Platform = Application.platform == RuntimePlatform.Android ? "android"
+                     : Application.platform == RuntimePlatform.IPhonePlayer ? "ios" : "other",
+            DeviceFields = BridgeDevice.Collect,
+            InstallReferrer = Application.platform == RuntimePlatform.Android ? PlayReferrer.Get : null,
+            // Transport = new UnityWebRequestTransport(),   // required on WebGL (no HttpClient there)
+        });
+
+        Client.OnLinkStart += s => ShowSpinner();       // the link can take 1–6 s to resolve
+        Client.OnLink += e =>                           // past events are replayed to you
+        {
+            HideSpinner();
+            if (e.Matched) Route(e.Path, e.Params);     // e.Kind direct/deferred, e.AppState, e.LinkId …
+            else Debug.Log($"Bridge: {e.Kind} link not matched ({e.Reason})");
+        };
+
+        // Links that arrive while the game is running:
+        Application.deepLinkActivated += url => _ = Client.HandleUrl(url);
+        // The link that launched the game ("" when none), then the deferred check (once per install):
+        await Client.Start(Application.absoluteURL);
+    }
+
+    // Lifecycle → app-state labels (background vs foreground).
+    void OnApplicationPause(bool paused) => Client?.OnAppState(paused ? AppLifecycle.Background : AppLifecycle.Active);
+    void OnApplicationFocus(bool focused) => Client?.OnAppState(focused ? AppLifecycle.Active : AppLifecycle.Inactive);
+    void OnDestroy() => Client?.Stop();
+
+    void ShowSpinner() { /* … */ }
+    void HideSpinner() { /* … */ }
+    void Route(string path, System.Collections.Generic.IReadOnlyDictionary<string, string> query) { /* … */ }
+}
 ```
 
-**Publishable key:** Dashboard → Get started → Publishable key (`bk_pub_live_…`).
-It's safe to include in your app. Never put your secret key (`bk_live_…`) in an app.
+Call `Start` and `HandleUrl` from the main thread. The client awaits without
+`ConfigureAwait(false)`, so `OnLink` and `OnLinkStart` fire on Unity's main thread, and
+`PlayerPrefs` is only touched there. A subscriber that throws is isolated: it cannot
+break link handling or other subscribers.
+
+Analytics and the debug fingerprint check:
+
+```csharp
+await BridgeLinks.Client.TrackEvent("purchase", value: 4.99, currency: "USD", linkId: lastLink?.LinkId);
+var mine = await BridgeLinks.Client.ReportFingerprint();    // Dictionary<string, object?>, or null when offline
+var cmp  = await BridgeLinks.Client.CompareFingerprint();   // the engine's app-vs-browser comparison
+```
+
+### PlayerPrefs storage
+
+```csharp
+public sealed class PlayerPrefsStore : IKeyValueStore
+{
+    public Task<string> GetItemAsync(string key) =>
+        Task.FromResult(PlayerPrefs.HasKey(key) ? PlayerPrefs.GetString(key) : null);
+    public Task SetItemAsync(string key, string value)
+    {
+        PlayerPrefs.SetString(key, value);
+        PlayerPrefs.Save();                     // persist now; the deferred flag must survive a crash
+        return Task.CompletedTask;
+    }
+}
+```
+
+### Device fields (deferred-match fingerprint)
+
+The values must match what the browser saw when the user tapped the link: CSS
+`screen.width` (portrait, rounded like Chrome), `devicePixelRatio`, the locale and the IANA
+time zone. Do not use `Screen.width`, which follows Unity's render scaling and orientation.
+
+```csharp
+public static class BridgeDevice
+{
+    public static DeviceFields Collect()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        using var player = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
+        using var activity = player.GetStatic<AndroidJavaObject>("currentActivity");
+        using var res = activity.Call<AndroidJavaObject>("getResources");
+        using var dm = res.Call<AndroidJavaObject>("getDisplayMetrics");
+        float density = dm.Get<float>("density");
+        int portraitPx = Math.Min(Display.main.systemWidth, Display.main.systemHeight);
+        using var locale = new AndroidJavaClass("java.util.Locale").CallStatic<AndroidJavaObject>("getDefault");
+        using var tz = new AndroidJavaClass("java.util.TimeZone").CallStatic<AndroidJavaObject>("getDefault");
+        return new DeviceFields
+        {
+            ScreenWidth = BridgeCore.BrowserScreenWidth(portraitPx / density),
+            PixelRatio = density,
+            Language = locale.Call<string>("toLanguageTag"),
+            Timezone = tz.Call<string>("getID"),
+        };
+#elif UNITY_IOS && !UNITY_EDITOR
+        return new DeviceFields
+        {
+            ScreenWidth = BridgeCore.BrowserScreenWidth(_BridgeScreenPortraitWidth()),
+            PixelRatio = _BridgeScreenScale(),
+            Language = _BridgeLanguage(),
+            Timezone = _BridgeTimezone(),
+        };
+#else
+        return null;                            // editor / desktop: the match request omits device fields
+#endif
+    }
+
+#if UNITY_IOS && !UNITY_EDITOR
+    [System.Runtime.InteropServices.DllImport("__Internal")] static extern float _BridgeScreenPortraitWidth();
+    [System.Runtime.InteropServices.DllImport("__Internal")] static extern float _BridgeScreenScale();
+    [System.Runtime.InteropServices.DllImport("__Internal")] static extern string _BridgeLanguage();
+    [System.Runtime.InteropServices.DllImport("__Internal")] static extern string _BridgeTimezone();
+#endif
+}
+```
+
+`Assets/Plugins/iOS/BridgeDevice.mm` (Unity has no API for `UIScreen.scale` or the IANA zone):
+
+```objc
+#import <UIKit/UIKit.h>
+static char *BridgeDup(NSString *s) { const char *c = [s UTF8String]; char *r = (char *)malloc(strlen(c) + 1); strcpy(r, c); return r; }
+extern "C" {
+  float _BridgeScreenPortraitWidth() { CGSize s = UIScreen.mainScreen.bounds.size; return (float)MIN(s.width, s.height); }
+  float _BridgeScreenScale() { return (float)UIScreen.mainScreen.scale; }
+  char *_BridgeLanguage() { return BridgeDup(NSLocale.preferredLanguages.firstObject ?: @"en"); }
+  char *_BridgeTimezone() { return BridgeDup(NSTimeZone.localTimeZone.name); }
+}
+```
+
+### Android Play Install Referrer
+
+Add `com.android.installreferrer:installreferrer:2.2` to your Gradle dependencies, either
+with a custom `mainTemplate.gradle` or with EDM4U. Then:
+
+```csharp
+public static class PlayReferrer
+{
+    public static async Task<string> Get()
+    {
+        var tcs = new TaskCompletionSource<string>();
+        using var player = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
+        var activity = player.GetStatic<AndroidJavaObject>("currentActivity");
+        var client = new AndroidJavaClass("com.android.installreferrer.api.InstallReferrerClient")
+            .CallStatic<AndroidJavaObject>("newBuilder", activity).Call<AndroidJavaObject>("build");
+        client.Call("startConnection", new Listener(client, tcs));
+        var done = await Task.WhenAny(tcs.Task, Task.Delay(5000));
+        return done == tcs.Task ? tcs.Task.Result : null;   // no referrer → Bridge falls back to /v1/match
+    }
+
+    sealed class Listener : AndroidJavaProxy
+    {
+        readonly AndroidJavaObject _client; readonly TaskCompletionSource<string> _tcs;
+        public Listener(AndroidJavaObject c, TaskCompletionSource<string> t)
+            : base("com.android.installreferrer.api.InstallReferrerStateListener") { _client = c; _tcs = t; }
+        void onInstallReferrerSetupFinished(int code)
+        {
+            try
+            {
+                if (code != 0) { _tcs.TrySetResult(null); return; }         // 0 = OK
+                using var details = _client.Call<AndroidJavaObject>("getInstallReferrer");
+                _tcs.TrySetResult(details.Call<string>("getInstallReferrer"));
+            }
+            catch { _tcs.TrySetResult(null); }
+            finally { _client.Call("endConnection"); }
+        }
+        void onInstallReferrerServiceDisconnected() => _tcs.TrySetResult(null);
+    }
+}
+```
+
+### WebGL: UnityWebRequest transport
+
+`HttpClient` does not work on WebGL. Supply a transport there. It must throw on network
+failure, which the client reports as `reason: "network"`:
+
+```csharp
+public sealed class UnityWebRequestTransport : IBridgeTransport
+{
+    public Task<(int Status, string Body)> SendAsync(string method, string url, string json)
+    {
+        var tcs = new TaskCompletionSource<(int, string)>();
+        var req = new UnityEngine.Networking.UnityWebRequest(url, method)
+            { downloadHandler = new UnityEngine.Networking.DownloadHandlerBuffer() };
+        if (json != null)
+        {
+            req.uploadHandler = new UnityEngine.Networking.UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
+            req.SetRequestHeader("Content-Type", "application/json");
+        }
+        req.SendWebRequest().completed += _ =>
+        {
+            if (req.result == UnityEngine.Networking.UnityWebRequest.Result.ConnectionError)
+                tcs.TrySetException(new Exception(req.error));
+            else
+                tcs.TrySetResult(((int)req.responseCode, req.downloadHandler.text ?? ""));
+            req.Dispose();
+        };
+        return tcs.Task;
+    }
+}
+```
+
+## API summary
+
+- `BridgeCore`: `BrowserScreenWidth`, `SplitUrl`, `ParseBridgeLink`, `ClassifyUrl`, `NormalizeLinkHosts`
+  (pure, vector-tested). `AppStateTracker` (`ResumeWindowMs = 2000`, `TransientPauseMs = 1000`).
+- `BridgeClient`: `Start(initialUrl)`, `HandleUrl(raw)`, `OnAppState(state[, nowMs])`,
+  `event OnLink` (replays past events), `event OnLinkStart`, `Events`, `CheckDeferred()`
+  (doesn't touch the once-per-install flag), `ReportFingerprint()`, `CompareFingerprint()`,
+  `TrackEvent(name, value, currency, linkId)`, `Stop()`.
+- `LinkEvent`: `Id, Kind, Route, AppState, Matched, Reason, RawUrl, Url, Path, Params, LinkId, Ms, At`.
+  These are the same fields and wire values as the React Native SDK.
+- `BridgeSignature`: deferred-match signature port (`H32`, `Compute`). C# int overflow is
+  wrapped with `unchecked` to match JS's 32-bit `|0`.
+
+## Test
+
+```sh
+dotnet test test/Bridge.Signature.Tests.csproj   # what CI runs (.NET 8)
+```

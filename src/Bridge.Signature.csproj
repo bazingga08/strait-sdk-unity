@@ -5,5 +5,6 @@
     <LangVersion>latest</LangVersion>
     <AssemblyName>Bridge.Signature</AssemblyName>
     <RootNamespace>Bridge</RootNamespace>
+    <Version>0.3.0</Version>
   </PropertyGroup>
 </Project>
