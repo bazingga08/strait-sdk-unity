@@ -72,14 +72,14 @@ namespace Bridge.Tests
         {
             public BridgeClient Bridge = null!;
             public List<LinkEvent> Events = new List<LinkEvent>();
-            public MemoryKeyValueStore Storage = null!;
+            public IKeyValueStore Storage = null!;
             public long T = 1_800_000_000_000;
             public void Tap(string url) => _ = Bridge.HandleUrl(url); // like the OS delivering a URL
             public void SetState(string s) => Bridge.OnAppState(s);
             public void Advance(long ms) => T += ms;
         }
 
-        private static Harness Make(FakeEngine engine, MemoryKeyValueStore? storage = null, string? referrer = null, string platform = "android")
+        private static Harness Make(FakeEngine engine, IKeyValueStore? storage = null, string? referrer = null, string platform = "android")
         {
             var h = new Harness { Storage = storage ?? new MemoryKeyValueStore() };
             h.Bridge = new BridgeClient(new BridgeConfig
@@ -370,6 +370,28 @@ namespace Bridge.Tests
             await h.Bridge.CheckDeferred();
             var call = Assert.Single(engine.Of("/v1/match"));
             AssertBody(call.Body, ("openId", null), ("at", null));
+        }
+
+        private sealed class BrokenStore : IKeyValueStore
+        {
+            public bool ReadFails;
+            public Task<string?> GetItemAsync(string key) =>
+                ReadFails ? throw new System.IO.IOException("io") : Task.FromResult<string?>(null);
+            public Task SetItemAsync(string key, string value) => throw new System.IO.IOException("full");
+        }
+
+        [Fact]
+        public async Task UnreadableStorage_IsAlreadyChecked_NoDeferredJump_WriteFailuresNeverThrow()
+        {
+            var engine = new FakeEngine(("/v1/match", NoMatch()), ("/v1/resolve", Resolved()));
+            await Make(engine, new BrokenStore { ReadFails = true }).Bridge.Start(null);
+            Assert.Empty(engine.Of("/v1/match"));
+            var e2 = new FakeEngine(("/v1/match", NoMatch()));
+            await Make(e2, new BrokenStore()).Bridge.Start(null); // completes without throwing
+            var e3 = new FakeEngine(("/v1/resolve", Resolved()));
+            var h3 = Make(e3, new BrokenStore());
+            await h3.Bridge.Start("https://links.test/sale");
+            Assert.Single(h3.Events);
         }
     }
 }
