@@ -58,10 +58,25 @@ server answered, so an offline first launch is retried on the next launch.
 
 ## Install
 
-Requires Unity 2021.2+ with **Api Compatibility Level = .NET Standard 2.1**. Copy
-`src/*.cs` into your project (for example `Assets/Bridge/`). Do not copy the `.csproj`.
-You can also build `src/Bridge.Signature.csproj` and drop the DLL into `Assets/Plugins/`.
-The assembly name `Bridge.Signature` is historical. Everything is in namespace `Bridge`.
+Requires Unity 2021.2+ with **Api Compatibility Level = .NET Standard 2.1**.
+
+<!-- brand:install -->
+Unity **Window → Package Manager → + → Add package from git URL…**:
+
+```text
+https://github.com/bazingga08/bridge-sdk-unity.git?path=src#v0.4.0
+```
+
+Or with [OpenUPM](https://openupm.com): `openupm add com.bridge.sdk`.
+<!-- /brand:install -->
+
+The package (folder `src/`) compiles into the `Bridge.Sdk` assembly; everything is in
+namespace `Bridge`. Package Manager → this package → *Samples* → **Quick start** imports a
+ready-made `BridgeBootstrap` MonoBehaviour.
+
+Without Package Manager: copy `src/*.cs` into your project (for example
+`Assets/Bridge/`), or build `src/Bridge.Signature.csproj` and drop the DLL into
+`Assets/Plugins/` (the assembly name `Bridge.Signature` is historical).
 
 **Publishable key:** Dashboard → Get started → Publishable key (`bk_pub_live_…`). It is
 safe to put in your app. Never put your secret key (`bk_live_…`) in an app.
@@ -84,7 +99,7 @@ public class BridgeLinks : MonoBehaviour
         Client = new BridgeClient(new BridgeConfig
         {
             PublishableKey = "bk_pub_live_…",
-            Endpoint = "https://bridge-redirect-engine.onrender.com",
+            Endpoint = "https://go.yourbrand.com",
             LinkHosts = { "go.yourbrand.com" },          // custom domains, if any
             Storage = new PlayerPrefsStore(),
             Platform = Application.platform == RuntimePlatform.Android ? "android"
