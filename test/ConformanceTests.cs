@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using Bridge;
+using Strait;
 using Xunit;
 
-namespace Bridge.Tests
+namespace Strait.Tests
 {
     /// <summary>shared-spec/conformance-vectors.json — every case must pass (SDK-CONTRACT.md).</summary>
     public class ConformanceTests
@@ -39,13 +39,13 @@ namespace Bridge.Tests
             var c = Vectors().GetProperty("constants");
             Assert.Equal(AppStateTracker.ResumeWindowMs, c.GetProperty("RESUME_WINDOW_MS").GetInt32());
             Assert.Equal(AppStateTracker.TransientPauseMs, c.GetProperty("TRANSIENT_PAUSE_MS").GetInt32());
-            Assert.Equal(BridgeCore.OpenQueueMax, c.GetProperty("OPEN_QUEUE_MAX").GetInt32());
-            Assert.Equal(BridgeCore.OpenQueueMaxAgeMs, c.GetProperty("OPEN_QUEUE_MAX_AGE_MS").GetInt64());
+            Assert.Equal(StraitCore.OpenQueueMax, c.GetProperty("OPEN_QUEUE_MAX").GetInt32());
+            Assert.Equal(StraitCore.OpenQueueMaxAgeMs, c.GetProperty("OPEN_QUEUE_MAX_AGE_MS").GetInt64());
             Assert.Equal(4, c.EnumerateObject().Count());
             Assert.Equal(2000, AppStateTracker.ResumeWindowMs);
             Assert.Equal(1000, AppStateTracker.TransientPauseMs);
-            Assert.Equal(100, BridgeCore.OpenQueueMax);
-            Assert.Equal(604_800_000L, BridgeCore.OpenQueueMaxAgeMs);
+            Assert.Equal(100, StraitCore.OpenQueueMax);
+            Assert.Equal(604_800_000L, StraitCore.OpenQueueMaxAgeMs);
         }
 
         [Fact]
@@ -54,7 +54,7 @@ namespace Bridge.Tests
             foreach (var c in Vectors().GetProperty("screenWidth").EnumerateArray())
             {
                 double logical = c.GetProperty("logical").GetDouble();
-                Assert.True(c.GetProperty("expected").GetInt32() == BridgeCore.BrowserScreenWidth(logical), $"logical={logical:R}");
+                Assert.True(c.GetProperty("expected").GetInt32() == StraitCore.BrowserScreenWidth(logical), $"logical={logical:R}");
             }
         }
 
@@ -65,7 +65,7 @@ namespace Bridge.Tests
             {
                 var input = c.GetProperty("input").GetString();
                 var exp = c.GetProperty("expected");
-                var got = BridgeCore.SplitUrl(input);
+                var got = StraitCore.SplitUrl(input);
                 if (exp.ValueKind == JsonValueKind.Null)
                 {
                     Assert.True(got == null, $"expected null for '{input}'");
@@ -82,7 +82,7 @@ namespace Bridge.Tests
         }
 
         [Fact]
-        public void ParseBridgeLinkVectors()
+        public void ParseStraitLinkVectors()
         {
             foreach (var c in Vectors().GetProperty("referrer").EnumerateArray())
             {
@@ -90,20 +90,20 @@ namespace Bridge.Tests
                 string? input = inp.ValueKind == JsonValueKind.Null ? null : inp.GetString();
                 var exp = c.GetProperty("expected");
                 string? expected = exp.ValueKind == JsonValueKind.Null ? null : exp.GetString();
-                Assert.True(expected == BridgeCore.ParseBridgeLink(input), $"input='{input}'");
+                Assert.True(expected == StraitCore.ParseStraitLink(input), $"input='{input}'");
             }
         }
 
         private static string? StrOrNull(JsonElement e) => e.ValueKind == JsonValueKind.Null ? null : e.GetString();
 
         [Fact]
-        public void ParseBridgeClickVectors()
+        public void ParseStraitClickVectors()
         {
             foreach (var c in Vectors().GetProperty("referrerClick").EnumerateArray())
             {
                 string? input = StrOrNull(c.GetProperty("input"));
                 string? expected = StrOrNull(c.GetProperty("expected"));
-                Assert.True(expected == BridgeCore.ParseBridgeClick(input), $"input='{input}'");
+                Assert.True(expected == StraitCore.ParseStraitClick(input), $"input='{input}'");
             }
         }
 
@@ -115,7 +115,7 @@ namespace Bridge.Tests
                 var input = c.GetProperty("input").GetString()!;
                 var exp = c.GetProperty("expected");
                 Assert.Equal(2, exp.EnumerateObject().Count());
-                var (url, clickId) = BridgeCore.TakeClickId(input);
+                var (url, clickId) = StraitCore.TakeClickId(input);
                 Assert.True(exp.GetProperty("url").GetString() == url, $"url for '{input}': got '{url}'");
                 Assert.True(StrOrNull(exp.GetProperty("clickId")) == clickId, $"clickId for '{input}': got '{clickId}'");
             }
@@ -129,7 +129,7 @@ namespace Bridge.Tests
                 var name = c.GetProperty("name").GetString();
                 var queue = c.GetProperty("queue").EnumerateArray()
                     .Select(r => (OpenId: r.GetProperty("openId").GetString()!, At: r.GetProperty("at").GetInt64())).ToList();
-                var got = BridgeCore.PruneOpenQueue(queue, c.GetProperty("now").GetInt64(), r => r.At).Select(r => r.OpenId).ToList();
+                var got = StraitCore.PruneOpenQueue(queue, c.GetProperty("now").GetInt64(), r => r.At).Select(r => r.OpenId).ToList();
                 var expected = c.GetProperty("expected").EnumerateArray().Select(e => e.GetString()!).ToList();
                 Assert.True(expected.SequenceEqual(got), $"{name}: expected [{string.Join(",", expected)}] got [{string.Join(",", got)}]");
             }
@@ -142,7 +142,7 @@ namespace Bridge.Tests
             {
                 var st = c.GetProperty("status");
                 int? status = st.ValueKind == JsonValueKind.Null ? (int?)null : st.GetInt32();
-                Assert.True(c.GetProperty("expected").GetBoolean() == BridgeCore.ShouldRetryReport(status), $"status={status}");
+                Assert.True(c.GetProperty("expected").GetBoolean() == StraitCore.ShouldRetryReport(status), $"status={status}");
             }
         }
 
@@ -154,7 +154,7 @@ namespace Bridge.Tests
                 var raw = c.GetProperty("raw").GetString();
                 var hosts = c.GetProperty("linkHosts").EnumerateArray().Select(h => h.GetString()!).ToList();
                 var exp = c.GetProperty("expected");
-                var got = BridgeCore.ClassifyUrl(raw, hosts);
+                var got = StraitCore.ClassifyUrl(raw, hosts);
                 if (exp.ValueKind == JsonValueKind.Null)
                 {
                     Assert.True(got == null, $"expected null for '{raw}'");
@@ -192,7 +192,7 @@ namespace Bridge.Tests
                 var endpoint = c.GetProperty("endpoint").GetString();
                 var hosts = c.GetProperty("linkHosts").EnumerateArray().Select(h => h.GetString()).ToList();
                 var expected = c.GetProperty("expected").EnumerateArray().Select(e => e.GetString()!).ToList();
-                var got = BridgeCore.NormalizeLinkHosts(endpoint, hosts);
+                var got = StraitCore.NormalizeLinkHosts(endpoint, hosts);
                 Assert.True(expected.SequenceEqual(got), $"{endpoint}: expected [{string.Join(",", expected)}] got [{string.Join(",", got)}]");
             }
         }
@@ -230,31 +230,31 @@ namespace Bridge.Tests
         [InlineData("a+b%2Bc", "a b+c")]
         public void DecodeMatchesJs(string input, string expected)
         {
-            Assert.Equal(expected, BridgeCore.Decode(input));
+            Assert.Equal(expected, StraitCore.Decode(input));
         }
 
         [Fact]
         public void NewOpenId_Format()
         {
             var re = new System.Text.RegularExpressions.Regex("^o_[a-z0-9]+_[a-z0-9]{12}$");
-            var ids = Enumerable.Range(0, 50).Select(_ => BridgeCore.NewOpenId(1_800_000_000_000)).ToList();
+            var ids = Enumerable.Range(0, 50).Select(_ => StraitCore.NewOpenId(1_800_000_000_000)).ToList();
             Assert.All(ids, id => Assert.Matches(re, id));
             Assert.Equal(50, ids.Distinct().Count());
-            Assert.StartsWith("o_mywpiww0_", BridgeCore.NewOpenId(1_800_000_000_000)); // (1.8e12).toString(36)
-            Assert.Equal("o_0_aaaaaaaaaaaa", BridgeCore.NewOpenId(0, () => 0));
-            Assert.Equal("o_z_999999999999", BridgeCore.NewOpenId(35, () => 0.9999));
+            Assert.StartsWith("o_mywpiww0_", StraitCore.NewOpenId(1_800_000_000_000)); // (1.8e12).toString(36)
+            Assert.Equal("o_0_aaaaaaaaaaaa", StraitCore.NewOpenId(0, () => 0));
+            Assert.Equal("o_z_999999999999", StraitCore.NewOpenId(35, () => 0.9999));
         }
 
         [Fact]
         public void SplitUrlEdgeCases()
         {
-            var p = BridgeCore.SplitUrl("  \uFEFFHTTPS://A.B/x?k=1&k=2#f  ")!;
+            var p = StraitCore.SplitUrl("  \uFEFFHTTPS://A.B/x?k=1&k=2#f  ")!;
             Assert.Equal("https", p.Scheme);
             Assert.Equal("a.b", p.Host);
             Assert.Equal("/x", p.Path);
             Assert.Equal("2", p.Params["k"]); // later duplicate wins
-            Assert.Null(BridgeCore.SplitUrl(null));
-            Assert.Null(BridgeCore.SplitUrl("1http://x"));
+            Assert.Null(StraitCore.SplitUrl(null));
+            Assert.Null(StraitCore.SplitUrl("1http://x"));
         }
     }
 }

@@ -59,9 +59,9 @@
       }
     },
     {
-      "input": "bridgelink://shop.example/p/42?color=red#frag",
+      "input": "straitlink://shop.example/p/42?color=red#frag",
       "expected": {
-        "scheme": "bridgelink",
+        "scheme": "straitlink",
         "host": "shop.example",
         "path": "/p/42",
         "params": {
@@ -113,11 +113,11 @@
   ],
   "referrer": [
     {
-      "input": "utm_source=google-play&bridge_link=lnk_7",
+      "input": "utm_source=google-play&strait_link=lnk_7",
       "expected": "lnk_7"
     },
     {
-      "input": "bridge_link=lnk%5F7&utm_medium=cpc",
+      "input": "strait_link=lnk%5F7&utm_medium=cpc",
       "expected": "lnk_7"
     },
     {
@@ -125,11 +125,11 @@
       "expected": null
     },
     {
-      "input": "bridge_link=",
+      "input": "strait_link=",
       "expected": null
     },
     {
-      "input": "xbridge_link=lnk_9",
+      "input": "xstrait_link=lnk_9",
       "expected": null
     },
     {
@@ -143,27 +143,27 @@
   ],
   "referrerClick": [
     {
-      "input": "bridge_link=lnk_7&bridge_click=3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f",
+      "input": "strait_link=lnk_7&strait_click=3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f",
       "expected": "3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f"
     },
     {
-      "input": "bridge_click=3F2A9C1E-7B4D-4E8A-9C0F-1A2B3C4D5E6F&bridge_link=lnk_7",
+      "input": "strait_click=3F2A9C1E-7B4D-4E8A-9C0F-1A2B3C4D5E6F&strait_link=lnk_7",
       "expected": "3F2A9C1E-7B4D-4E8A-9C0F-1A2B3C4D5E6F"
     },
     {
-      "input": "utm_source=google-play&bridge_link=lnk_7&bridge_click=3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f",
+      "input": "utm_source=google-play&strait_link=lnk_7&strait_click=3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f",
       "expected": "3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f"
     },
     {
-      "input": "bridge_link=lnk_7",
+      "input": "strait_link=lnk_7",
       "expected": null
     },
     {
-      "input": "bridge_link=lnk_7&bridge_click=not-a-uuid",
+      "input": "strait_link=lnk_7&strait_click=not-a-uuid",
       "expected": null
     },
     {
-      "input": "bridge_link=lnk_7&bridge_click=",
+      "input": "strait_link=lnk_7&strait_click=",
       "expected": null
     },
     {
@@ -177,58 +177,58 @@
   ],
   "takeClickId": [
     {
-      "input": "bridgelink://shop.example/p/42?color=red&bridge_click=3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f",
+      "input": "straitlink://shop.example/p/42?color=red&strait_click=3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f",
       "expected": {
-        "url": "bridgelink://shop.example/p/42?color=red",
+        "url": "straitlink://shop.example/p/42?color=red",
         "clickId": "3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f"
       }
     },
     {
-      "input": "bridgelink://shop.example/p/42?bridge_click=3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f&color=red#top",
+      "input": "straitlink://shop.example/p/42?strait_click=3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f&color=red#top",
       "expected": {
-        "url": "bridgelink://shop.example/p/42?color=red#top",
+        "url": "straitlink://shop.example/p/42?color=red#top",
         "clickId": "3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f"
       }
     },
     {
-      "input": "bridgelink://shop.example/p/42?bridge_click=3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f",
+      "input": "straitlink://shop.example/p/42?strait_click=3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f",
       "expected": {
-        "url": "bridgelink://shop.example/p/42",
+        "url": "straitlink://shop.example/p/42",
         "clickId": "3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f"
       }
     },
     {
-      "input": "https://shop.example/p/42?bridge_click=3F2A9C1E-7B4D-4E8A-9C0F-1A2B3C4D5E6F",
+      "input": "https://shop.example/p/42?strait_click=3F2A9C1E-7B4D-4E8A-9C0F-1A2B3C4D5E6F",
       "expected": {
         "url": "https://shop.example/p/42",
         "clickId": "3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f"
       }
     },
     {
-      "input": "bridgelink://shop.example/p/42?bridge_click=not-a-uuid&x=1",
+      "input": "straitlink://shop.example/p/42?strait_click=not-a-uuid&x=1",
       "expected": {
-        "url": "bridgelink://shop.example/p/42?x=1",
+        "url": "straitlink://shop.example/p/42?x=1",
         "clickId": null
       }
     },
     {
-      "input": "bridgelink://shop.example/p/42?x=a%20b&y=1",
+      "input": "straitlink://shop.example/p/42?x=a%20b&y=1",
       "expected": {
-        "url": "bridgelink://shop.example/p/42?x=a%20b&y=1",
+        "url": "straitlink://shop.example/p/42?x=a%20b&y=1",
         "clickId": null
       }
     },
     {
-      "input": "bridgelink://shop.example/p/42",
+      "input": "straitlink://shop.example/p/42",
       "expected": {
-        "url": "bridgelink://shop.example/p/42",
+        "url": "straitlink://shop.example/p/42",
         "clickId": null
       }
     },
     {
-      "input": "bridgelink://shop.example/p?bridge%5Fclick=3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f&z=2",
+      "input": "straitlink://shop.example/p?strait%5Fclick=3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f&z=2",
       "expected": {
-        "url": "bridgelink://shop.example/p?z=2",
+        "url": "straitlink://shop.example/p?z=2",
         "clickId": "3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f"
       }
     }
@@ -285,7 +285,7 @@
       }
     },
     {
-      "raw": "bridgelink://shop.example/p/42?color=red",
+      "raw": "straitlink://shop.example/p/42?color=red",
       "linkHosts": [
         "links.test",
         "go.brand.com"
@@ -325,7 +325,7 @@
       "expected": null
     },
     {
-      "raw": "bridgelink://shop.example/p/42?color=red&bridge_click=3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f",
+      "raw": "straitlink://shop.example/p/42?color=red&strait_click=3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f",
       "linkHosts": [
         "links.test",
         "go.brand.com"
@@ -342,7 +342,7 @@
       }
     },
     {
-      "raw": "bridgelink://shop.example/p/42?bridge_click=3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f",
+      "raw": "straitlink://shop.example/p/42?strait_click=3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f",
       "linkHosts": [
         "links.test",
         "go.brand.com"
@@ -357,7 +357,7 @@
       }
     },
     {
-      "raw": "https://shop.example/p/42?bridge_click=3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f&utm_source=sms",
+      "raw": "https://shop.example/p/42?strait_click=3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f&utm_source=sms",
       "linkHosts": [
         "links.test",
         "go.brand.com"
@@ -374,7 +374,7 @@
       }
     },
     {
-      "raw": "https://links.test/sale?bridge_click=3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f",
+      "raw": "https://links.test/sale?strait_click=3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f",
       "linkHosts": [
         "links.test",
         "go.brand.com"
@@ -387,10 +387,10 @@
   ],
   "linkHosts": [
     {
-      "endpoint": "https://bridge-redirect-engine.onrender.com",
+      "endpoint": "https://strait-redirect-engine.onrender.com",
       "linkHosts": [],
       "expected": [
-        "bridge-redirect-engine.onrender.com"
+        "strait-redirect-engine.onrender.com"
       ]
     },
     {

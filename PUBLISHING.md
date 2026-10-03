@@ -13,7 +13,7 @@ install block, `LICENSE` and `src/LICENSE.md`.
 
 ## One-time owner setup
 
-1. **Pick the brand.** From `bridge/`: `shared-spec/scripts/rename-brand.sh … --final --apply`.
+1. **Pick the brand.** From the workspace root (the folder holding every SDK repo): `shared-spec/scripts/rename-brand.sh … --final --apply`.
    Rename/move the GitHub repo first if it will change.
 2. **Make the GitHub repo public.**
 3. **OpenUPM:** https://openupm.com/packages/add/ → paste the repo URL → it finds
@@ -23,11 +23,11 @@ install block, `LICENSE` and `src/LICENSE.md`.
 ## Every release
 
 1. Bump `version` in `src/package.json` **and** `<Version>` in
-   `src/Bridge.Signature.csproj`, add a `## X.Y.Z` entry to CHANGELOG.md, run
+   `src/Strait.Signature.csproj`, add a `## X.Y.Z` entry to CHANGELOG.md, run
    `node scripts/brand.mjs --write` (updates the README's `#vX.Y.Z`) and
    `node scripts/unity-meta.mjs --write` (any new file in `src/` needs a `.meta`, or
    Unity silently ignores it). Commit.
-2. `dotnet test test/Bridge.Signature.Tests.csproj`.
+2. `dotnet test test/Strait.Signature.Tests.csproj`.
 3. `git tag vX.Y.Z && git push origin main vX.Y.Z`.
 4. *Actions → Release* checks the versions agree, runs the tests, the `.meta` check,
    and refuses a placeholder brand (a public tag can't be taken back).

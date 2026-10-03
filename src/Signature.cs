@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 
-namespace Bridge
+namespace Strait
 {
     /// <summary>
-    /// Bridge deferred-match signature — C# port of shared-spec/RECIPE.md.
+    /// Strait deferred-match signature — C# port of shared-spec/RECIPE.md.
     /// MUST be byte-identical to the JS reference + every other SDK (golden vectors).
     /// C# int overflow is wrapped with `unchecked` to match JS's 32-bit `h |= 0`.
     /// </summary>
@@ -19,7 +19,7 @@ namespace Bridge
         }
     }
 
-    public static class BridgeSignature
+    public static class StraitSignature
     {
         private static readonly Dictionary<string, string> RegionMap = new()
         {

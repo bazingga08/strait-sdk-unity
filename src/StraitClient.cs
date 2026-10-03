@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Bridge
+namespace Strait
 {
     /// <summary>Persistent key/value storage (e.g. PlayerPrefs). Must survive app restarts.</summary>
     public interface IKeyValueStore
@@ -33,13 +33,13 @@ namespace Bridge
     /// One HTTP request. <paramref name="jsonBody"/> is null for GET. Return the status code and
     /// body text; throw on network failure (the client turns that into reason "network").
     /// </summary>
-    public interface IBridgeTransport
+    public interface IStraitTransport
     {
         Task<(int Status, string Body)> SendAsync(string method, string url, string? jsonBody);
     }
 
     /// <summary>Default transport on System.Net.Http.HttpClient. (WebGL: supply a UnityWebRequest transport.)</summary>
-    public sealed class HttpClientTransport : IBridgeTransport
+    public sealed class HttpClientTransport : IStraitTransport
     {
         private static readonly Lazy<HttpClient> Shared = new Lazy<HttpClient>(() =>
             new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
@@ -64,7 +64,7 @@ namespace Bridge
     /// <summary>Device fields for the deferred-match fingerprint (must agree with the browser at the tap).</summary>
     public sealed class DeviceFields
     {
-        /// <summary>Use <see cref="BridgeCore.BrowserScreenWidth"/>(portrait logical width) — B2.</summary>
+        /// <summary>Use <see cref="StraitCore.BrowserScreenWidth"/>(portrait logical width) — B2.</summary>
         public int ScreenWidth { get; set; }
         public double PixelRatio { get; set; }
         /// <summary>BCP-47 locale, e.g. "en-IN".</summary>
@@ -73,11 +73,11 @@ namespace Bridge
         public string Timezone { get; set; } = "XX";
     }
 
-    public sealed class BridgeConfig
+    public sealed class StraitConfig
     {
-        /// <summary>Workspace publishable key (bk_pub_live_…), Dashboard → Get started. Never a secret key.</summary>
+        /// <summary>Workspace publishable key (st_pub_live_…), Dashboard → Get started. Never a secret key.</summary>
         public string PublishableKey { get; set; } = "";
-        /// <summary>Your Bridge link host, e.g. https://go.yourbrand.com</summary>
+        /// <summary>Your Strait link host, e.g. https://go.yourbrand.com</summary>
         public string Endpoint { get; set; } = "";
         /// <summary>Extra hosts serving your short links (custom domains): "go.brand.com" or "https://go.brand.com".</summary>
         public IList<string> LinkHosts { get; set; } = new List<string>();
@@ -90,7 +90,7 @@ namespace Bridge
         /// <summary>Collects the device fingerprint fields. Called on demand.</summary>
         public Func<DeviceFields?>? DeviceFields { get; set; }
         /// <summary>HTTP transport. Default: <see cref="HttpClientTransport"/>.</summary>
-        public IBridgeTransport? Transport { get; set; }
+        public IStraitTransport? Transport { get; set; }
         /// <summary>Clock in Unix ms. Default: system clock. (Tests inject a fake.)</summary>
         public Func<long>? Clock { get; set; }
     }
@@ -98,7 +98,7 @@ namespace Bridge
     /// <summary>One event type for every link case (B9). Wire-identical to the React Native SDK's LinkEvent.</summary>
     public sealed class LinkEvent
     {
-        /// <summary>Unique per open; also the id Bridge records this open under (B14).</summary>
+        /// <summary>Unique per open; also the id Strait records this open under (B14).</summary>
         public string Id { get; internal set; } = "";
         /// <summary>"direct" = opened by a link; "deferred" = link tapped before install.</summary>
         public string Kind { get; internal set; } = "";
@@ -133,24 +133,24 @@ namespace Bridge
     }
 
     /// <summary>
-    /// Bridge deep-linking client: a port of sdk-react-native/src/bridge.ts with no Unity
+    /// Strait deep-linking client: a port of sdk-react-native/src/strait.ts with no Unity
     /// dependency. The game feeds it URLs and lifecycle changes (see README); it never throws
     /// from link handling (B10). Continuations resume on the caller's SynchronizationContext,
     /// so when called from Unity's main thread, events are raised on the main thread.
-    /// Every open is reported to Bridge exactly once (B14); reports that don't get through are
-    /// saved in <see cref="BridgeConfig.Storage"/> and retried.
+    /// Every open is reported to Strait exactly once (B14); reports that don't get through are
+    /// saved in <see cref="StraitConfig.Storage"/> and retried.
     /// </summary>
-    public sealed class BridgeClient
+    public sealed class StraitClient
     {
-        public const string DeferredFlag = "bridge.deferredChecked";
+        public const string DeferredFlag = "strait.deferredChecked";
         /// <summary>Storage key of the unsent open reports (JSON array).</summary>
-        public const string QueueKey = "bridge.pendingOpens";
+        public const string QueueKey = "strait.pendingOpens";
 
-        private readonly BridgeConfig _config;
+        private readonly StraitConfig _config;
         private readonly string _base;
         private readonly IReadOnlyList<string> _linkHosts;
         private readonly IKeyValueStore _storage;
-        private readonly IBridgeTransport _transport;
+        private readonly IStraitTransport _transport;
         private readonly Func<long> _now;
         private readonly AppStateTracker _tracker = new AppStateTracker();
         private readonly object _gate = new object();
@@ -163,17 +163,17 @@ namespace Bridge
         private bool _started;
         private volatile bool _stopped;
 
-        public BridgeClient(BridgeConfig config)
+        public StraitClient(StraitConfig config)
         {
             _config = config ?? throw new ArgumentNullException(nameof(config));
             _base = (config.Endpoint ?? "").TrimEnd('/');
-            _linkHosts = BridgeCore.NormalizeLinkHosts(_base, config.LinkHosts);
+            _linkHosts = StraitCore.NormalizeLinkHosts(_base, config.LinkHosts);
             _storage = config.Storage ?? new MemoryKeyValueStore();
             _transport = config.Transport ?? new HttpClientTransport();
             _now = config.Clock ?? (() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
         }
 
-        /// <summary>Hosts treated as Bridge short-link hosts (endpoint host + LinkHosts), lower-cased.</summary>
+        /// <summary>Hosts treated as Strait short-link hosts (endpoint host + LinkHosts), lower-cased.</summary>
         public IReadOnlyList<string> LinkHosts => _linkHosts;
 
         // ------------------------------------------------------------------ events
@@ -343,13 +343,13 @@ namespace Bridge
         private async Task<LinkEvent> HandleUrlInternal(string raw, string appState, bool firstLaunch = false)
         {
             long t0 = Now();
-            var id = BridgeCore.NewOpenId(t0);
+            var id = StraitCore.NewOpenId(t0);
             var platform = _config.Platform;
             Announce(new LinkStart { Id = id, Kind = "direct", AppState = appState, RawUrl = raw, At = t0 });
             var ev = new LinkEvent { Id = id, Kind = "direct", Route = LinkRoutes.AppLink, AppState = appState, RawUrl = raw, At = t0 };
             try
             {
-                var c = BridgeCore.ClassifyUrl(raw, _linkHosts);
+                var c = StraitCore.ClassifyUrl(raw, _linkHosts);
                 if (c == null)
                 {
                     ev.Matched = false;
@@ -420,7 +420,7 @@ namespace Bridge
         private async Task<LinkEvent> RunDeferred(bool record)
         {
             long t0 = Now();
-            var id = BridgeCore.NewOpenId(t0);
+            var id = StraitCore.NewOpenId(t0);
             Announce(new LinkStart { Id = id, Kind = "deferred", AppState = LinkAppStates.Closed, At = t0 });
             var ev = new LinkEvent { Id = id, Kind = "deferred", Route = LinkRoutes.Fingerprint, AppState = LinkAppStates.Closed, At = t0 };
             try
@@ -431,14 +431,14 @@ namespace Bridge
                     string? referrer = null;
                     try { if (_config.InstallReferrer != null) referrer = await _config.InstallReferrer(); }
                     catch { referrer = null; }
-                    var linkId = BridgeCore.ParseBridgeLink(referrer);
+                    var linkId = StraitCore.ParseStraitLink(referrer);
                     if (linkId != null)
                     {
                         var body = new List<KeyValuePair<string, object?>>
                         {
                             Kv("publishableKey", _config.PublishableKey),
                             Kv("linkId", linkId),
-                            Kv("clickId", BridgeCore.ParseBridgeClick(referrer)),
+                            Kv("clickId", StraitCore.ParseStraitClick(referrer)),
                             Kv("platform", "android"),
                         };
                         if (record) { body.Add(Kv("openId", id)); body.Add(Kv("at", t0)); }
@@ -485,7 +485,7 @@ namespace Bridge
         private async Task<Response> Answered(string path, List<KeyValuePair<string, object?>> body)
         {
             var res = await Call("POST", path, body);
-            if (BridgeCore.ShouldRetryReport(res.Status)) throw new HttpRequestException("HTTP " + res.Status);
+            if (StraitCore.ShouldRetryReport(res.Status)) throw new HttpRequestException("HTTP " + res.Status);
             return res;
         }
 
@@ -514,7 +514,7 @@ namespace Bridge
             try
             {
                 var text = await _storage.GetItemAsync(QueueKey);
-                if (BridgeJson.Parse(text ?? "[]") is List<object?> items)
+                if (StraitJson.Parse(text ?? "[]") is List<object?> items)
                     foreach (var item in items) if (item is Dictionary<string, object?> r) q.Add(r);
             }
             catch { /* unreadable → empty */ }
@@ -526,7 +526,7 @@ namespace Bridge
             try
             {
                 var sb = new StringBuilder();
-                BridgeJson.WriteValue(sb, q, 0);
+                StraitJson.WriteValue(sb, q, 0);
                 await _storage.SetItemAsync(QueueKey, sb.ToString());
             }
             catch { /* best effort */ }
@@ -535,7 +535,7 @@ namespace Bridge
         private static long AtOf(Dictionary<string, object?> r) =>
             r.TryGetValue("at", out var v) ? v switch { long l => l, int i => i, double d => (long)d, _ => 0 } : 0;
 
-        private List<Dictionary<string, object?>> Prune(List<Dictionary<string, object?>> q) => BridgeCore.PruneOpenQueue(q, Now(), AtOf);
+        private List<Dictionary<string, object?>> Prune(List<Dictionary<string, object?>> q) => StraitCore.PruneOpenQueue(q, Now(), AtOf);
 
         private Task Enqueue(Dictionary<string, object?> report) =>
             Serial(async () =>
@@ -564,7 +564,7 @@ namespace Bridge
             try
             {
                 var status = await SendReport(report);
-                if (BridgeCore.ShouldRetryReport(status)) await Enqueue(report);
+                if (StraitCore.ShouldRetryReport(status)) await Enqueue(report);
                 else _ = Flush(); // the network works: send anything saved earlier
             }
             catch { /* never throw */ }
@@ -598,7 +598,7 @@ namespace Bridge
                         if (offline) { keep.Add(rep); continue; }
                         var status = await SendReport(rep);
                         offline = status == null;
-                        if (BridgeCore.ShouldRetryReport(status)) keep.Add(rep);
+                        if (StraitCore.ShouldRetryReport(status)) keep.Add(rep);
                     }
                     await WriteQueue(keep);
                     return true;
@@ -629,16 +629,16 @@ namespace Bridge
         /// <summary>Throws on transport failure; an unparseable body becomes an empty object.</summary>
         private async Task<Response> Call(string method, string path, List<KeyValuePair<string, object?>>? body)
         {
-            var json = body == null ? null : BridgeJson.Serialize(body);
+            var json = body == null ? null : StraitJson.Serialize(body);
             var (status, text) = await _transport.SendAsync(method, _base + path, json);
-            return new Response { Ok = status >= 200 && status < 300, Status = status, Json = BridgeJson.ParseObjectOrEmpty(text) };
+            return new Response { Ok = status >= 200 && status < 300, Status = status, Json = StraitJson.ParseObjectOrEmpty(text) };
         }
 
         private static void SetDestination(LinkEvent ev, string? url)
         {
             if (string.IsNullOrEmpty(url)) return;
             ev.Url = url;
-            var p = BridgeCore.SplitUrl(url);
+            var p = StraitCore.SplitUrl(url);
             if (p != null) { ev.Path = p.Path; ev.Params = p.Params; }
         }
 

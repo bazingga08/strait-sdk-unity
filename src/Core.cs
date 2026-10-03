@@ -4,9 +4,9 @@ using System.Text;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 
-[assembly: InternalsVisibleTo("Bridge.Signature.Tests")]
+[assembly: InternalsVisibleTo("Strait.Signature.Tests")]
 
-namespace Bridge
+namespace Strait
 {
     /// <summary>How the app received a link (wire values, identical across SDKs).</summary>
     public static class LinkRoutes
@@ -25,7 +25,7 @@ namespace Bridge
         public const string Foreground = "foreground";
     }
 
-    /// <summary>App lifecycle states fed to <see cref="AppStateTracker"/> / BridgeClient.OnAppState.</summary>
+    /// <summary>App lifecycle states fed to <see cref="AppStateTracker"/> / StraitClient.OnAppState.</summary>
     public static class AppLifecycle
     {
         public const string Active = "active";
@@ -33,7 +33,7 @@ namespace Bridge
         public const string Inactive = "inactive";
     }
 
-    /// <summary>Result of <see cref="BridgeCore.SplitUrl"/>.</summary>
+    /// <summary>Result of <see cref="StraitCore.SplitUrl"/>.</summary>
     public sealed class SplitUrlResult
     {
         public SplitUrlResult(string scheme, string host, string path, IReadOnlyDictionary<string, string> @params)
@@ -47,8 +47,8 @@ namespace Bridge
     }
 
     /// <summary>
-    /// Result of <see cref="BridgeCore.ClassifyUrl"/>. When <see cref="NeedsResolve"/> is true the
-    /// URL is a Bridge short link (ask /v1/resolve) and Url/Path/Params/ClickId are null.
+    /// Result of <see cref="StraitCore.ClassifyUrl"/>. When <see cref="NeedsResolve"/> is true the
+    /// URL is a Strait short link (ask /v1/resolve) and Url/Path/Params/ClickId are null.
     /// </summary>
     public sealed class ClassifiedUrl
     {
@@ -62,7 +62,7 @@ namespace Bridge
         public string? Url { get; }
         public string? Path { get; }
         public IReadOnlyDictionary<string, string>? Params { get; }
-        /// <summary>Tap id from a Bridge hand-off (removed from Url/Params), else null.</summary>
+        /// <summary>Tap id from a Strait hand-off (removed from Url/Params), else null.</summary>
         public string? ClickId { get; }
     }
 
@@ -71,7 +71,7 @@ namespace Bridge
     /// conformance-vectors.json is the cross-language contract (shared-spec/SDK-CONTRACT.md).
     /// Deliberately avoids System.Uri: its semantics differ from the reference (B12).
     /// </summary>
-    public static class BridgeCore
+    public static class StraitCore
     {
         /// <summary>
         /// Screen width as a browser reports it (<c>screen.width</c>). Chrome rounds fractional
@@ -124,7 +124,7 @@ namespace Bridge
             @"^[A-Za-z0-9.\-]+(:[0-9]+)?\z", RegexOptions.CultureInvariant);
 
         /// <summary>
-        /// The Bridge short-link hosts: the endpoint's host plus each configured link host, given
+        /// The Strait short-link hosts: the endpoint's host plus each configured link host, given
         /// as a URL or a bare host ("go.brand.com", "localhost:3000"). Lower-cased, de-duplicated
         /// in order; blanks and anything with a path or spaces are ignored; ports are kept.
         /// </summary>
@@ -149,16 +149,16 @@ namespace Bridge
             return out_;
         }
 
-        /// <summary>The bridge_link id inside a Play Install Referrer string, or null.</summary>
-        public static string? ParseBridgeLink(string? referrer) => ReferrerParam(referrer, "bridge_link");
+        /// <summary>The strait_link id inside a Play Install Referrer string, or null.</summary>
+        public static string? ParseStraitLink(string? referrer) => ReferrerParam(referrer, "strait_link");
 
         /// <summary>
-        /// The tap id (bridge_click) inside a Play Install Referrer string, or null.
+        /// The tap id (strait_click) inside a Play Install Referrer string, or null.
         /// Joins the install to the exact tap that sent the user to the store.
         /// </summary>
-        public static string? ParseBridgeClick(string? referrer)
+        public static string? ParseStraitClick(string? referrer)
         {
-            var v = ReferrerParam(referrer, "bridge_click");
+            var v = ReferrerParam(referrer, "strait_click");
             return v != null && ClickIdRe.IsMatch(v) ? v : null;
         }
 
@@ -175,12 +175,12 @@ namespace Bridge
             return null;
         }
 
-        // JS: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i — a tap id as Bridge issues it (uuid).
+        // JS: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i — a tap id as Strait issues it (uuid).
         private static readonly Regex ClickIdRe = new Regex(
             @"^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\z", RegexOptions.CultureInvariant);
 
         /// <summary>
-        /// Remove every <c>bridge_click</c> parameter from a URL's query, keeping the rest of the URL
+        /// Remove every <c>strait_click</c> parameter from a URL's query, keeping the rest of the URL
         /// byte-for-byte (fragment included). Returns the cleaned URL and the tap id (lower-cased;
         /// null when absent or malformed). The app never sees the tap id.
         /// </summary>
@@ -197,7 +197,7 @@ namespace Bridge
             foreach (var pair in beforeHash.Substring(q + 1).Split('&'))
             {
                 int i = pair.IndexOf('=');
-                if (Decode(i < 0 ? pair : pair.Substring(0, i)) != "bridge_click") { kept.Add(pair); continue; }
+                if (Decode(i < 0 ? pair : pair.Substring(0, i)) != "strait_click") { kept.Add(pair); continue; }
                 var v = Decode(i < 0 ? "" : pair.Substring(i + 1));
                 if (ClickIdRe.IsMatch(v)) clickId = v.ToLowerInvariant();
             }
@@ -207,10 +207,10 @@ namespace Bridge
 
         /// <summary>
         /// What a URL handed to the app means:
-        /// https on a Bridge link host → short link (needs /v1/resolve);
+        /// https on a Strait link host → short link (needs /v1/resolve);
         /// other https → it IS the destination;
         /// yourapp://host/path (browser hand-off) → destination https://host/path.
-        /// A <c>bridge_click</c> tap id is removed from the destination and returned apart.
+        /// A <c>strait_click</c> tap id is removed from the destination and returned apart.
         /// Null for anything that isn't a URL.
         /// </summary>
         public static ClassifiedUrl? ClassifyUrl(string? raw, IEnumerable<string> linkHosts)

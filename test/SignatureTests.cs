@@ -1,9 +1,9 @@
 using System.IO;
 using System.Text.Json;
-using Bridge;
+using Strait;
 using Xunit;
 
-namespace Bridge.Tests
+namespace Strait.Tests
 {
     public class SignatureTests
     {
@@ -19,7 +19,7 @@ namespace Bridge.Tests
             foreach (var v in Vectors().GetProperty("h32").EnumerateArray())
             {
                 Assert.Equal(v.GetProperty("expected").GetString(),
-                    BridgeSignature.H32(v.GetProperty("input").GetString()!));
+                    StraitSignature.H32(v.GetProperty("input").GetString()!));
             }
         }
 
@@ -30,7 +30,7 @@ namespace Bridge.Tests
             {
                 var inp = v.GetProperty("input");
                 var exp = v.GetProperty("expected");
-                var sig = BridgeSignature.Compute(
+                var sig = StraitSignature.Compute(
                     inp.GetProperty("screenWidth").GetDouble(),
                     inp.GetProperty("pixelRatio").GetDouble(),
                     inp.GetProperty("language").GetString()!,
@@ -49,7 +49,7 @@ namespace Bridge.Tests
         [InlineData(1176.0, "1176")]
         public void NumStrParity(double n, string expected)
         {
-            Assert.Equal(expected, BridgeSignature.NumStr(n));
+            Assert.Equal(expected, StraitSignature.NumStr(n));
         }
     }
 }

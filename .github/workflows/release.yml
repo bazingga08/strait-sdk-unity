@@ -18,9 +18,9 @@ jobs:
       - name: Tag matches src/package.json and the csproj version
         run: |
           v="$(node -p "require('./src/package.json').version")"
-          c="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' src/Bridge.Signature.csproj)"
+          c="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' src/Strait.Signature.csproj)"
           [ "$GITHUB_REF_NAME" = "v$v" ] && [ "$c" = "$v" ] || { echo "::error::tag $GITHUB_REF_NAME, src/package.json $v and csproj $c must agree"; exit 1; }
-      - run: dotnet test test/Bridge.Signature.Tests.csproj
+      - run: dotnet test test/Strait.Signature.Tests.csproj
       - run: node scripts/unity-meta.mjs
       - run: node scripts/brand.mjs
       - run: node scripts/brand.mjs --release

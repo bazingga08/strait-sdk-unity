@@ -1,7 +1,7 @@
 {
-  "name": "com.bridge.sdk",
-  "version": "0.4.0",
-  "displayName": "Bridge SDK",
+  "name": "com.strait.sdk",
+  "version": "0.5.0",
+  "displayName": "Strait SDK",
   "description": "Deep links and deferred deep links for Unity games: direct links (App Links, Universal Links, custom schemes), deferred links that survive the install, and link-open analytics. Plain C#, no third-party DLLs.",
   "unity": "2021.2",
   "keywords": [
@@ -13,12 +13,12 @@
     "app-links"
   ],
   "license": "MIT",
-  "documentationUrl": "https://github.com/bazingga08/bridge-sdk-unity#readme",
-  "changelogUrl": "https://github.com/bazingga08/bridge-sdk-unity/blob/main/CHANGELOG.md",
-  "licensesUrl": "https://github.com/bazingga08/bridge-sdk-unity/blob/main/LICENSE",
+  "documentationUrl": "https://github.com/bazingga08/strait-sdk-unity#readme",
+  "changelogUrl": "https://github.com/bazingga08/strait-sdk-unity/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/bazingga08/strait-sdk-unity/blob/main/LICENSE",
   "author": {
-    "name": "[Company legal name]",
-    "url": "https://yourbrand.com"
+    "name": "Strait Technologies",
+    "url": "https://usestrait.com"
   },
   "samples": [
     {

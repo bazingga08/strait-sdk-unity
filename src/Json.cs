@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 
-namespace Bridge
+namespace Strait
 {
     /// <summary>
     /// Minimal, dependency-free JSON for the SDK's small request/response bodies, so a Unity
@@ -11,7 +11,7 @@ namespace Bridge
     /// Writer escapes every string (B11); reader is a strict RFC 8259 recursive-descent parser.
     /// Parsed values: Dictionary&lt;string, object?&gt;, List&lt;object?&gt;, string, double, bool, null.
     /// </summary>
-    public static class BridgeJson
+    public static class StraitJson
     {
         private const int MaxDepth = 64;
 

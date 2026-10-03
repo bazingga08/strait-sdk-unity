@@ -4,10 +4,10 @@ using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Bridge;
+using Strait;
 using Xunit;
 
-namespace Bridge.Tests
+namespace Strait.Tests
 {
     /// <summary>
     /// Port of sdk-react-native/test/opens.test.ts. Contract B14: every link open is reported
@@ -15,7 +15,7 @@ namespace Bridge.Tests
     /// </summary>
     public class OpensTests
     {
-        private const string PK = "bk_pub_test_appowner01";
+        private const string PK = "st_pub_test_appowner01";
         private const string Endpoint = "https://links.test";
         private const string Click = "3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f";
         private const string OpenIdPattern = "^o_[a-z0-9]+_[a-z0-9]{12}$";
@@ -48,7 +48,7 @@ namespace Bridge.Tests
         }
 
         /// <summary>Fake engine whose answer per path can change mid-test. Unknown path → 404.</summary>
-        private sealed class FakeEngine : IBridgeTransport
+        private sealed class FakeEngine : IStraitTransport
         {
             public readonly Dictionary<string, Reply> Routes;
             public readonly List<Call> Calls = new List<Call>();
@@ -70,19 +70,19 @@ namespace Bridge.Tests
 
         private sealed class Harness
         {
-            public BridgeClient Bridge = null!;
+            public StraitClient Strait = null!;
             public List<LinkEvent> Events = new List<LinkEvent>();
             public IKeyValueStore Storage = null!;
             public long T = 1_800_000_000_000;
-            public void Tap(string url) => _ = Bridge.HandleUrl(url); // like the OS delivering a URL
-            public void SetState(string s) => Bridge.OnAppState(s);
+            public void Tap(string url) => _ = Strait.HandleUrl(url); // like the OS delivering a URL
+            public void SetState(string s) => Strait.OnAppState(s);
             public void Advance(long ms) => T += ms;
         }
 
         private static Harness Make(FakeEngine engine, IKeyValueStore? storage = null, string? referrer = null, string platform = "android")
         {
             var h = new Harness { Storage = storage ?? new MemoryKeyValueStore() };
-            h.Bridge = new BridgeClient(new BridgeConfig
+            h.Strait = new StraitClient(new StraitConfig
             {
                 PublishableKey = PK,
                 Endpoint = Endpoint,
@@ -93,14 +93,14 @@ namespace Bridge.Tests
                 Transport = engine,
                 Clock = () => h.T,
             });
-            h.Bridge.OnLink += e => { lock (h.Events) h.Events.Add(e); };
+            h.Strait.OnLink += e => { lock (h.Events) h.Events.Add(e); };
             return h;
         }
 
         private static MemoryKeyValueStore Returning()
         {
             var s = new MemoryKeyValueStore();
-            s.SetItemAsync(BridgeClient.DeferredFlag, "1").Wait(); // not the first launch
+            s.SetItemAsync(StraitClient.DeferredFlag, "1").Wait(); // not the first launch
             return s;
         }
 
@@ -138,9 +138,9 @@ namespace Bridge.Tests
         {
             var engine = new FakeEngine(("/v1/open", Accepted()));
             var h = Make(engine, Returning());
-            await h.Bridge.Start(null);
+            await h.Strait.Start(null);
             h.SetState("background"); h.Advance(5000); h.SetState("active"); h.Advance(200);
-            h.Tap($"bridgelink://shop.example/p/42?color=red&bridge_click={Click}");
+            h.Tap($"straitlink://shop.example/p/42?color=red&strait_click={Click}");
             await Settle();
             var e = h.Events.Last();
             Assert.Equal("custom_scheme", e.Route);
@@ -159,7 +159,7 @@ namespace Bridge.Tests
         {
             var engine = new FakeEngine(("/v1/open", Hang()));
             var h = Make(engine, Returning());
-            await h.Bridge.Start($"bridgelink://shop.example/p/1?bridge_click={Click}");
+            await h.Strait.Start($"straitlink://shop.example/p/1?strait_click={Click}");
             Assert.Single(h.Events);
             Assert.Equal("https://shop.example/p/1", h.Events[0].Url);
         }
@@ -168,7 +168,7 @@ namespace Bridge.Tests
         public async Task CustomersOwnHttpsLink_IsReportedToo_NoTapId()
         {
             var engine = new FakeEngine(("/v1/open", Accepted()));
-            await Make(engine, Returning()).Bridge.Start("https://shop.example/p/9");
+            await Make(engine, Returning()).Strait.Start("https://shop.example/p/9");
             await Settle();
             var body = engine.Of("/v1/open")[0].Body;
             AssertBody(body, ("route", "app_link"), ("url", "https://shop.example/p/9"), ("appState", "closed"), ("clickId", null));
@@ -181,7 +181,7 @@ namespace Bridge.Tests
         {
             var engine = new FakeEngine(("/v1/resolve", Resolved()), ("/v1/open", Accepted()));
             var h = Make(engine, Returning());
-            await h.Bridge.Start("https://links.test/sale");
+            await h.Strait.Start("https://links.test/sale");
             await Settle();
             AssertBody(engine.Of("/v1/resolve")[0].Body, ("openId", h.Events[0].Id), ("appState", "closed"),
                 ("firstLaunch", false), ("at", h.Events[0].At));
@@ -193,7 +193,7 @@ namespace Bridge.Tests
         {
             var engine = new FakeEngine(("/v1/resolve", Resolved(recorded: false)), ("/v1/open", Accepted()));
             var h = Make(engine, Returning());
-            await h.Bridge.Start("https://links.test/sale");
+            await h.Strait.Start("https://links.test/sale");
             await Settle();
             Assert.True(h.Events[0].Matched);
             AssertBody(engine.Of("/v1/open")[0].Body, ("openId", h.Events[0].Id), ("route", "app_link"),
@@ -206,20 +206,20 @@ namespace Bridge.Tests
             var storage = Returning();
             var engine = new FakeEngine(("/v1/resolve", Offline()), ("/v1/open", Offline()));
             var h = Make(engine, storage);
-            await h.Bridge.Start(null);
+            await h.Strait.Start(null);
             h.Tap("https://links.test/sale");
             await Settle();
             var last = h.Events.Last();
             Assert.False(last.Matched);
             Assert.Equal("network", last.Reason);
-            Assert.Equal(1, await h.Bridge.PendingOpenReports());
+            Assert.Equal(1, await h.Strait.PendingOpenReports());
             // network returns; user leaves and comes back
             engine.Routes["/v1/open"] = Accepted();
             h.SetState("background"); h.Advance(10_000); h.SetState("active");
             await Settle();
             var sent = engine.Of("/v1/open").Where(c => c.Body.GetProperty("openId").GetString() == last.Id).ToList();
             AssertBody(sent.Last().Body, ("route", "app_link"), ("url", "https://links.test/sale"), ("matched", false), ("reason", "network"));
-            Assert.Equal(0, await h.Bridge.PendingOpenReports());
+            Assert.Equal(0, await h.Strait.PendingOpenReports());
         }
 
         // ---------------------------------------------- the retry queue
@@ -229,16 +229,16 @@ namespace Bridge.Tests
         {
             var engine = new FakeEngine(("/v1/open", Status(503)));
             var h = Make(engine, Returning());
-            await h.Bridge.Start(null);
-            h.Tap("bridgelink://a.b/1");
+            await h.Strait.Start(null);
+            h.Tap("straitlink://a.b/1");
             await Settle();
-            Assert.Equal(1, await h.Bridge.PendingOpenReports());
+            Assert.Equal(1, await h.Strait.PendingOpenReports());
             engine.Routes["/v1/open"] = Status(429);
-            await h.Bridge.FlushOpenReports();
-            Assert.Equal(1, await h.Bridge.PendingOpenReports());
+            await h.Strait.FlushOpenReports();
+            Assert.Equal(1, await h.Strait.PendingOpenReports());
             engine.Routes["/v1/open"] = Status(400, "{\"error\":\"bad\"}");
-            await h.Bridge.FlushOpenReports();
-            Assert.Equal(0, await h.Bridge.PendingOpenReports());
+            await h.Strait.FlushOpenReports();
+            Assert.Equal(0, await h.Strait.PendingOpenReports());
         }
 
         [Fact]
@@ -247,19 +247,19 @@ namespace Bridge.Tests
             var storage = Returning();
             var e1 = new FakeEngine(("/v1/open", Offline()));
             var first = Make(e1, storage);
-            await first.Bridge.Start(null);
-            first.Tap("bridgelink://a.b/1");
-            first.Tap("bridgelink://a.b/2");
+            await first.Strait.Start(null);
+            first.Tap("straitlink://a.b/1");
+            first.Tap("straitlink://a.b/2");
             await Settle();
-            Assert.Equal(2, await first.Bridge.PendingOpenReports());
-            first.Bridge.Stop();
+            Assert.Equal(2, await first.Strait.PendingOpenReports());
+            first.Strait.Stop();
 
             var e2 = new FakeEngine(("/v1/open", Accepted()));
             var second = Make(e2, storage);
-            await second.Bridge.Start(null);
+            await second.Strait.Start(null);
             await Settle();
             Assert.Equal(new[] { "https://a.b/1", "https://a.b/2" }, e2.Of("/v1/open").Select(c => c.Body.GetProperty("url").GetString()).ToArray());
-            Assert.Equal(0, await second.Bridge.PendingOpenReports());
+            Assert.Equal(0, await second.Strait.PendingOpenReports());
         }
 
         [Fact]
@@ -267,13 +267,13 @@ namespace Bridge.Tests
         {
             var engine = new FakeEngine(("/v1/open", Offline()));
             var h = Make(engine, Returning());
-            await h.Bridge.Start(null);
-            h.Tap("bridgelink://a.b/old");
+            await h.Strait.Start(null);
+            h.Tap("straitlink://a.b/old");
             await Settle();
             engine.Routes["/v1/open"] = Accepted();
-            h.Tap("bridgelink://a.b/new");
+            h.Tap("straitlink://a.b/new");
             await Settle();
-            Assert.Equal(0, await h.Bridge.PendingOpenReports());
+            Assert.Equal(0, await h.Strait.PendingOpenReports());
             var oldIds = engine.Of("/v1/open").Where(c => c.Body.GetProperty("url").GetString() == "https://a.b/old")
                 .Select(c => c.Body.GetProperty("openId").GetString()).Distinct();
             Assert.Single(oldIds);
@@ -284,8 +284,8 @@ namespace Bridge.Tests
         {
             var engine = new FakeEngine(("/v1/open", Accepted()));
             var h = Make(engine, Returning());
-            await h.Bridge.Start(null);
-            for (int i = 0; i < 5; i++) h.Tap($"bridgelink://a.b/{i}");
+            await h.Strait.Start(null);
+            for (int i = 0; i < 5; i++) h.Tap($"straitlink://a.b/{i}");
             await Settle();
             Assert.Equal(5, h.Events.Select(e => e.Id).Distinct().Count());
         }
@@ -297,11 +297,11 @@ namespace Bridge.Tests
         {
             var engine = new FakeEngine(("/v1/resolve", Resolved()));
             var h = Make(engine);
-            await h.Bridge.Start("https://links.test/sale");
+            await h.Strait.Start("https://links.test/sale");
             AssertBody(engine.Of("/v1/resolve")[0].Body, ("firstLaunch", true));
             Assert.Empty(engine.Of("/v1/referrer"));
             Assert.Empty(engine.Of("/v1/match"));
-            Assert.Equal("1", await h.Storage.GetItemAsync(BridgeClient.DeferredFlag));
+            Assert.Equal("1", await h.Storage.GetItemAsync(StraitClient.DeferredFlag));
         }
 
         [Fact]
@@ -309,8 +309,8 @@ namespace Bridge.Tests
         {
             var engine = new FakeEngine(("/v1/referrer", Ok(
                 "{\"matched\":true,\"longUrl\":\"https://shop.example/p/42\",\"linkId\":\"lnk_42\",\"matchMethod\":\"install_referrer\"}")));
-            var h = Make(engine, referrer: $"utm_source=google-play&bridge_link=lnk_42&bridge_click={Click}");
-            await h.Bridge.Start(null);
+            var h = Make(engine, referrer: $"utm_source=google-play&strait_link=lnk_42&strait_click={Click}");
+            await h.Strait.Start(null);
             AssertBody(engine.Of("/v1/referrer")[0].Body, ("linkId", "lnk_42"), ("clickId", Click), ("openId", h.Events[0].Id),
                 ("at", h.Events[0].At), ("platform", "android"));
             var e = h.Events[0];
@@ -324,7 +324,7 @@ namespace Bridge.Tests
         {
             var engine = new FakeEngine(("/v1/match", NoMatch()));
             var h = Make(engine, platform: "ios");
-            await h.Bridge.Start(null);
+            await h.Strait.Start(null);
             var body = engine.Of("/v1/match")[0].Body;
             AssertBody(body, ("openId", h.Events[0].Id), ("platform", "ios"));
             AssertDevice(body);
@@ -336,18 +336,18 @@ namespace Bridge.Tests
             var storage = new MemoryKeyValueStore();
             var e1 = new FakeEngine(("/v1/match", Offline()));
             var first = Make(e1, storage);
-            await first.Bridge.Start(null);
+            await first.Strait.Start(null);
             Assert.Equal("deferred", first.Events[0].Kind);
             Assert.Equal("network", first.Events[0].Reason);
-            Assert.Null(await storage.GetItemAsync(BridgeClient.DeferredFlag));
+            Assert.Null(await storage.GetItemAsync(StraitClient.DeferredFlag));
 
             var e2 = new FakeEngine(("/v1/match", NoMatch()));
-            await Make(e2, storage).Bridge.Start(null);
+            await Make(e2, storage).Strait.Start(null);
             Assert.Single(e2.Of("/v1/match"));
-            Assert.Equal("1", await storage.GetItemAsync(BridgeClient.DeferredFlag));
+            Assert.Equal("1", await storage.GetItemAsync(StraitClient.DeferredFlag));
 
             var e3 = new FakeEngine(("/v1/match", NoMatch()));
-            await Make(e3, storage).Bridge.Start(null);
+            await Make(e3, storage).Strait.Start(null);
             Assert.Empty(e3.Of("/v1/match")); // once per install
         }
 
@@ -356,9 +356,9 @@ namespace Bridge.Tests
         {
             var storage = new MemoryKeyValueStore();
             var h = Make(new FakeEngine(("/v1/match", Status(502))), storage);
-            await h.Bridge.Start(null);
+            await h.Strait.Start(null);
             Assert.Equal("network", h.Events[0].Reason);
-            Assert.Null(await storage.GetItemAsync(BridgeClient.DeferredFlag));
+            Assert.Null(await storage.GetItemAsync(StraitClient.DeferredFlag));
         }
 
         [Fact]
@@ -366,8 +366,8 @@ namespace Bridge.Tests
         {
             var engine = new FakeEngine(("/v1/match", NoMatch()));
             var h = Make(engine, Returning());
-            await h.Bridge.Start(null);
-            await h.Bridge.CheckDeferred();
+            await h.Strait.Start(null);
+            await h.Strait.CheckDeferred();
             var call = Assert.Single(engine.Of("/v1/match"));
             AssertBody(call.Body, ("openId", null), ("at", null));
         }
@@ -384,13 +384,13 @@ namespace Bridge.Tests
         public async Task UnreadableStorage_IsAlreadyChecked_NoDeferredJump_WriteFailuresNeverThrow()
         {
             var engine = new FakeEngine(("/v1/match", NoMatch()), ("/v1/resolve", Resolved()));
-            await Make(engine, new BrokenStore { ReadFails = true }).Bridge.Start(null);
+            await Make(engine, new BrokenStore { ReadFails = true }).Strait.Start(null);
             Assert.Empty(engine.Of("/v1/match"));
             var e2 = new FakeEngine(("/v1/match", NoMatch()));
-            await Make(e2, new BrokenStore()).Bridge.Start(null); // completes without throwing
+            await Make(e2, new BrokenStore()).Strait.Start(null); // completes without throwing
             var e3 = new FakeEngine(("/v1/resolve", Resolved()));
             var h3 = Make(e3, new BrokenStore());
-            await h3.Bridge.Start("https://links.test/sale");
+            await h3.Strait.Start("https://links.test/sale");
             Assert.Single(h3.Events);
         }
     }

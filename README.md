@@ -1,14 +1,14 @@
-# bridge-sdk-unity (C#)
+# strait-sdk-unity (C#)
 
-Deep links and deferred deep links for Unity games. Part of [Bridge](../).
-Version **0.4.0**. It is at parity with the React Native reference SDK
+Deep links and deferred deep links for Unity games. Part of [Strait](../).
+Version **0.5.0**. It is at parity with the React Native reference SDK
 ([`shared-spec/SDK-CONTRACT.md`](../shared-spec/SDK-CONTRACT.md)).
 
 The library is plain C# (`netstandard2.1`) with **no UnityEngine dependency**, so
 `dotnet test` in CI checks it against the shared golden vectors
 (`test/test-vectors.json` and `test/conformance-vectors.json`). The game connects it to
 Unity's APIs, as shown below. It has no third-party DLLs: JSON is handled by a small
-built-in writer and parser (`BridgeJson`).
+built-in writer and parser (`StraitJson`).
 
 > ⚠️ The library is CI-verified with dotnet. The Unity glue below (MonoBehaviour,
 > PlayerPrefs, AndroidJavaObject, iOS plugin, UnityWebRequest) has not been run in the
@@ -20,28 +20,28 @@ built-in writer and parser (`BridgeJson`).
 | # | Behaviour | Status |
 |---|---|---|
 | B1 | `publishableKey` in every body (`/v1/match`, `/v1/referrer`, `/v1/resolve`, `/v1/open`, `/v1/event`, `/v1/debug/fingerprint`) | ✓ |
-| B2 | `BridgeCore.BrowserScreenWidth` = `ceil(w - 0.001)` | ✓ (the game supplies the width, see below) |
+| B2 | `StraitCore.BrowserScreenWidth` = `ceil(w - 0.001)` | ✓ (the game supplies the width, see below) |
 | B3 | Short-link hosts (endpoint + `LinkHosts`, via `NormalizeLinkHosts`) → `POST /v1/resolve {publishableKey,url,platform}` | ✓ |
-| B4 | `ClassifyUrl` (custom scheme → `https://host/path?q`; `bridge_click` tap id removed via `TakeClickId`, returned as `ClickId`) | ✓ |
+| B4 | `ClassifyUrl` (custom scheme → `https://host/path?q`; `strait_click` tap id removed via `TakeClickId`, returned as `ClickId`) | ✓ |
 | B5 | `closed` for the launch URL, else `AppStateTracker` (2000 / 1000 ms) | ✓ |
-| B6 | Deferred check once per install (`bridge.deferredChecked`), skipped but marked when launched by a link; marked only once the engine answered (no answer / 429 / 5xx → `reason:"network"`, retried next launch); `CheckDeferred()` sends no `openId` | ✓ |
-| B7 | Android: referrer `bridge_link` → `/v1/referrer {linkId, clickId, openId, at}`, else or on a miss → `/v1/match` (same `openId`) | ✓ (the game supplies the referrer) |
+| B6 | Deferred check once per install (`strait.deferredChecked`), skipped but marked when launched by a link; marked only once the engine answered (no answer / 429 / 5xx → `reason:"network"`, retried next launch); `CheckDeferred()` sends no `openId` | ✓ |
+| B7 | Android: referrer `strait_link` → `/v1/referrer {linkId, clickId, openId, at}`, else or on a miss → `/v1/match` (same `openId`) | ✓ (the game supplies the referrer) |
 | B8 | iOS: `/v1/match` with device fields + `openId`, `at` | ✓ |
 | B9 | One `LinkEvent` type, replayed to late `OnLink` subscribers; `OnLinkStart` with the same id | ✓ |
 | B10 | Never throws; network failure → `matched:false, reason:"network"` | ✓ |
 | B11 | All JSON goes through an escaping writer | ✓ |
 | B12 | `SplitUrl` matches the vectors exactly (no `System.Uri`) | ✓ |
 | B13 | `TrackEvent`, `ReportFingerprint` (origin `app`), `CompareFingerprint` | ✓ |
-| B14 | Every open reported exactly once (`NewOpenId` = `LinkEvent.Id`); failed reports saved under `bridge.pendingOpens` and retried; `PendingOpenReports()`, `FlushOpenReports()` | ✓ |
+| B14 | Every open reported exactly once (`NewOpenId` = `LinkEvent.Id`); failed reports saved under `strait.pendingOpens` and retried; `PendingOpenReports()`, `FlushOpenReports()` | ✓ |
 
-### What Bridge records automatically (no extra code)
+### What Strait records automatically (no extra code)
 
 Every time a link opens the game, the client reports it once (contract B14):
 
 | How the game opened | Reported via | Joined to |
 |---|---|---|
 | Verified link tapped in WhatsApp, Gmail, Messages… | `/v1/resolve` (the lookup is the report) | the link; also counted as a tap |
-| Browser handed off to the game (`yourgame://…`) | `/v1/open` | the exact tap (`bridge_click`, removed before `OnLink` sees the URL) |
+| Browser handed off to the game (`yourgame://…`) | `/v1/open` | the exact tap (`strait_click`, removed before `OnLink` sees the URL) |
 | First open after a Play install | `/v1/referrer` | the exact tap that sent the user to the store |
 | First open after an App Store install | `/v1/match` | the matched tap |
 | Your own https links | `/v1/open` | host + path only (never the query) |
@@ -64,47 +64,47 @@ Requires Unity 2021.2+ with **Api Compatibility Level = .NET Standard 2.1**.
 Unity **Window → Package Manager → + → Add package from git URL…**:
 
 ```text
-https://github.com/bazingga08/bridge-sdk-unity.git?path=src#v0.4.0
+https://github.com/bazingga08/strait-sdk-unity.git?path=src#v0.5.0
 ```
 
-Or with [OpenUPM](https://openupm.com): `openupm add com.bridge.sdk`.
+Or with [OpenUPM](https://openupm.com): `openupm add com.strait.sdk`.
 <!-- /brand:install -->
 
-The package (folder `src/`) compiles into the `Bridge.Sdk` assembly; everything is in
-namespace `Bridge`. Package Manager → this package → *Samples* → **Quick start** imports a
-ready-made `BridgeBootstrap` MonoBehaviour.
+The package (folder `src/`) compiles into the `Strait.Sdk` assembly; everything is in
+namespace `Strait`. Package Manager → this package → *Samples* → **Quick start** imports a
+ready-made `StraitBootstrap` MonoBehaviour.
 
 Without Package Manager: copy `src/*.cs` into your project (for example
-`Assets/Bridge/`), or build `src/Bridge.Signature.csproj` and drop the DLL into
-`Assets/Plugins/` (the assembly name `Bridge.Signature` is historical).
+`Assets/Strait/`), or build `src/Strait.Signature.csproj` and drop the DLL into
+`Assets/Plugins/`.
 
-**Publishable key:** Dashboard → Get started → Publishable key (`bk_pub_live_…`). It is
-safe to put in your app. Never put your secret key (`bk_live_…`) in an app.
+**Publishable key:** Dashboard → Get started → Publishable key (`st_pub_live_…`). It is
+safe to put in your app. Never put your secret key (`st_live_…`) in an app.
 
 ## Wire it into a game
 
 ```csharp
 using System;
 using System.Threading.Tasks;
-using Bridge;
+using Strait;
 using UnityEngine;
 
-public class BridgeLinks : MonoBehaviour
+public class StraitLinks : MonoBehaviour
 {
-    public static BridgeClient Client { get; private set; }
+    public static StraitClient Client { get; private set; }
 
     async void Start()
     {
         DontDestroyOnLoad(gameObject);
-        Client = new BridgeClient(new BridgeConfig
+        Client = new StraitClient(new StraitConfig
         {
-            PublishableKey = "bk_pub_live_…",
+            PublishableKey = "st_pub_live_…",
             Endpoint = "https://go.yourbrand.com",
             LinkHosts = { "go.yourbrand.com" },          // custom domains, if any
             Storage = new PlayerPrefsStore(),
             Platform = Application.platform == RuntimePlatform.Android ? "android"
                      : Application.platform == RuntimePlatform.IPhonePlayer ? "ios" : "other",
-            DeviceFields = BridgeDevice.Collect,
+            DeviceFields = StraitDevice.Collect,
             InstallReferrer = Application.platform == RuntimePlatform.Android ? PlayReferrer.Get : null,
             // Transport = new UnityWebRequestTransport(),   // required on WebGL (no HttpClient there)
         });
@@ -114,7 +114,7 @@ public class BridgeLinks : MonoBehaviour
         {
             HideSpinner();
             if (e.Matched) Route(e.Path, e.Params);     // e.Kind direct/deferred, e.AppState, e.LinkId …
-            else Debug.Log($"Bridge: {e.Kind} link not matched ({e.Reason})");
+            else Debug.Log($"Strait: {e.Kind} link not matched ({e.Reason})");
         };
 
         // Links that arrive while the game is running:
@@ -143,9 +143,9 @@ break link handling or other subscribers.
 Analytics and the debug fingerprint check:
 
 ```csharp
-await BridgeLinks.Client.TrackEvent("purchase", value: 4.99, currency: "USD", linkId: lastLink?.LinkId);
-var mine = await BridgeLinks.Client.ReportFingerprint();    // Dictionary<string, object?>, or null when offline
-var cmp  = await BridgeLinks.Client.CompareFingerprint();   // the engine's app-vs-browser comparison
+await StraitLinks.Client.TrackEvent("purchase", value: 4.99, currency: "USD", linkId: lastLink?.LinkId);
+var mine = await StraitLinks.Client.ReportFingerprint();    // Dictionary<string, object?>, or null when offline
+var cmp  = await StraitLinks.Client.CompareFingerprint();   // the engine's app-vs-browser comparison
 ```
 
 ### PlayerPrefs storage
@@ -171,7 +171,7 @@ The values must match what the browser saw when the user tapped the link: CSS
 time zone. Do not use `Screen.width`, which follows Unity's render scaling and orientation.
 
 ```csharp
-public static class BridgeDevice
+public static class StraitDevice
 {
     public static DeviceFields Collect()
     {
@@ -186,7 +186,7 @@ public static class BridgeDevice
         using var tz = new AndroidJavaClass("java.util.TimeZone").CallStatic<AndroidJavaObject>("getDefault");
         return new DeviceFields
         {
-            ScreenWidth = BridgeCore.BrowserScreenWidth(portraitPx / density),
+            ScreenWidth = StraitCore.BrowserScreenWidth(portraitPx / density),
             PixelRatio = density,
             Language = locale.Call<string>("toLanguageTag"),
             Timezone = tz.Call<string>("getID"),
@@ -194,10 +194,10 @@ public static class BridgeDevice
 #elif UNITY_IOS && !UNITY_EDITOR
         return new DeviceFields
         {
-            ScreenWidth = BridgeCore.BrowserScreenWidth(_BridgeScreenPortraitWidth()),
-            PixelRatio = _BridgeScreenScale(),
-            Language = _BridgeLanguage(),
-            Timezone = _BridgeTimezone(),
+            ScreenWidth = StraitCore.BrowserScreenWidth(_StraitScreenPortraitWidth()),
+            PixelRatio = _StraitScreenScale(),
+            Language = _StraitLanguage(),
+            Timezone = _StraitTimezone(),
         };
 #else
         return null;                            // editor / desktop: the match request omits device fields
@@ -205,24 +205,24 @@ public static class BridgeDevice
     }
 
 #if UNITY_IOS && !UNITY_EDITOR
-    [System.Runtime.InteropServices.DllImport("__Internal")] static extern float _BridgeScreenPortraitWidth();
-    [System.Runtime.InteropServices.DllImport("__Internal")] static extern float _BridgeScreenScale();
-    [System.Runtime.InteropServices.DllImport("__Internal")] static extern string _BridgeLanguage();
-    [System.Runtime.InteropServices.DllImport("__Internal")] static extern string _BridgeTimezone();
+    [System.Runtime.InteropServices.DllImport("__Internal")] static extern float _StraitScreenPortraitWidth();
+    [System.Runtime.InteropServices.DllImport("__Internal")] static extern float _StraitScreenScale();
+    [System.Runtime.InteropServices.DllImport("__Internal")] static extern string _StraitLanguage();
+    [System.Runtime.InteropServices.DllImport("__Internal")] static extern string _StraitTimezone();
 #endif
 }
 ```
 
-`Assets/Plugins/iOS/BridgeDevice.mm` (Unity has no API for `UIScreen.scale` or the IANA zone):
+`Assets/Plugins/iOS/StraitDevice.mm` (Unity has no API for `UIScreen.scale` or the IANA zone):
 
 ```objc
 #import <UIKit/UIKit.h>
-static char *BridgeDup(NSString *s) { const char *c = [s UTF8String]; char *r = (char *)malloc(strlen(c) + 1); strcpy(r, c); return r; }
+static char *StraitDup(NSString *s) { const char *c = [s UTF8String]; char *r = (char *)malloc(strlen(c) + 1); strcpy(r, c); return r; }
 extern "C" {
-  float _BridgeScreenPortraitWidth() { CGSize s = UIScreen.mainScreen.bounds.size; return (float)MIN(s.width, s.height); }
-  float _BridgeScreenScale() { return (float)UIScreen.mainScreen.scale; }
-  char *_BridgeLanguage() { return BridgeDup(NSLocale.preferredLanguages.firstObject ?: @"en"); }
-  char *_BridgeTimezone() { return BridgeDup(NSTimeZone.localTimeZone.name); }
+  float _StraitScreenPortraitWidth() { CGSize s = UIScreen.mainScreen.bounds.size; return (float)MIN(s.width, s.height); }
+  float _StraitScreenScale() { return (float)UIScreen.mainScreen.scale; }
+  char *_StraitLanguage() { return StraitDup(NSLocale.preferredLanguages.firstObject ?: @"en"); }
+  char *_StraitTimezone() { return StraitDup(NSTimeZone.localTimeZone.name); }
 }
 ```
 
@@ -243,7 +243,7 @@ public static class PlayReferrer
             .CallStatic<AndroidJavaObject>("newBuilder", activity).Call<AndroidJavaObject>("build");
         client.Call("startConnection", new Listener(client, tcs));
         var done = await Task.WhenAny(tcs.Task, Task.Delay(5000));
-        return done == tcs.Task ? tcs.Task.Result : null;   // no referrer → Bridge falls back to /v1/match
+        return done == tcs.Task ? tcs.Task.Result : null;   // no referrer → Strait falls back to /v1/match
     }
 
     sealed class Listener : AndroidJavaProxy
@@ -273,7 +273,7 @@ public static class PlayReferrer
 failure, which the client reports as `reason: "network"`:
 
 ```csharp
-public sealed class UnityWebRequestTransport : IBridgeTransport
+public sealed class UnityWebRequestTransport : IStraitTransport
 {
     public Task<(int Status, string Body)> SendAsync(string method, string url, string json)
     {
@@ -300,21 +300,21 @@ public sealed class UnityWebRequestTransport : IBridgeTransport
 
 ## API summary
 
-- `BridgeCore`: `BrowserScreenWidth`, `SplitUrl`, `ParseBridgeLink`, `ParseBridgeClick`, `TakeClickId`,
+- `StraitCore`: `BrowserScreenWidth`, `SplitUrl`, `ParseStraitLink`, `ParseStraitClick`, `TakeClickId`,
   `ClassifyUrl`, `NormalizeLinkHosts`, `PruneOpenQueue`, `ShouldRetryReport`, `NewOpenId`
   (pure, vector-tested; `OpenQueueMax = 100`, `OpenQueueMaxAgeMs` = 7 days).
   `AppStateTracker` (`ResumeWindowMs = 2000`, `TransientPauseMs = 1000`).
-- `BridgeClient`: `Start(initialUrl)`, `HandleUrl(raw)`, `OnAppState(state[, nowMs])`,
+- `StraitClient`: `Start(initialUrl)`, `HandleUrl(raw)`, `OnAppState(state[, nowMs])`,
   `event OnLink` (replays past events), `event OnLinkStart`, `Events`, `CheckDeferred()`
   (doesn't touch the once-per-install flag), `ReportFingerprint()`, `CompareFingerprint()`,
   `TrackEvent(name, value, currency, linkId)`, `PendingOpenReports()`, `FlushOpenReports()`, `Stop()`.
 - `LinkEvent`: `Id, Kind, Route, AppState, Matched, Reason, RawUrl, Url, Path, Params, LinkId, Ms, At`.
   These are the same fields and wire values as the React Native SDK.
-- `BridgeSignature`: deferred-match signature port (`H32`, `Compute`). C# int overflow is
+- `StraitSignature`: deferred-match signature port (`H32`, `Compute`). C# int overflow is
   wrapped with `unchecked` to match JS's 32-bit `|0`.
 
 ## Test
 
 ```sh
-dotnet test test/Bridge.Signature.Tests.csproj   # what CI runs (.NET 8)
+dotnet test test/Strait.Signature.Tests.csproj   # what CI runs (.NET 8)
 ```

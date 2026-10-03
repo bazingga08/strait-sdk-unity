@@ -1,6 +1,6 @@
 {
-    "name": "Bridge.Sdk",
-    "rootNamespace": "Bridge",
+    "name": "Strait.Sdk",
+    "rootNamespace": "Strait",
     "references": [],
     "includePlatforms": [],
     "excludePlatforms": [],

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.0
+
+Renamed to Strait (breaking, clean break: no `Bridge` aliases are kept).
+
+- Package `com.bridge.sdk` → `com.strait.sdk`; namespace `Bridge` → `Strait`; assembly
+  `Bridge.Sdk` → `Strait.Sdk` (`Strait.Sdk.asmdef`; `.meta` GUIDs unchanged, so GUID references
+  keep resolving; asmdef references by name must change to `Strait.Sdk`); `Bridge.Signature.csproj` → `Strait.Signature.csproj`.
+- Types: `BridgeClient` → `StraitClient`, `BridgeConfig` → `StraitConfig`, `BridgeCore` →
+  `StraitCore`, `BridgeJson` → `StraitJson`, `BridgeSignature` → `StraitSignature`,
+  `IBridgeTransport` → `IStraitTransport`; `ParseBridgeLink` / `ParseBridgeClick` →
+  `ParseStraitLink` / `ParseStraitClick`. Sample `BridgeBootstrap` → `StraitBootstrap`.
+- Wire params are now `strait_click` and `strait_link`; the old `bridge_*` names are no longer read.
+- Storage keys are now `strait.*` (`strait.deferredChecked`, `strait.pendingOpens`); values saved
+  under the old keys are ignored, so a deferred link may be checked once more after upgrading.
+- Publishable keys are issued as `st_pub_live_…` / `st_pub_test_…`.
+
 ## 0.4.0
 
 Reports every link open exactly once (`shared-spec/SDK-CONTRACT.md` B14, plus the B4/B6/B7/B8 revisions).

@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
-using Bridge;
+using Strait;
 using Xunit;
 
-namespace Bridge.Tests
+namespace Strait.Tests
 {
     /// <summary>The dependency-free JSON writer/reader, cross-checked against System.Text.Json.</summary>
     public class JsonTests
@@ -21,24 +21,24 @@ namespace Bridge.Tests
         [InlineData("")]
         public void WriterEscapesEveryString_RoundTripsThroughSystemTextJson(string s)
         {
-            var json = BridgeJson.Serialize(new[] { Kv("k", s), Kv(s, "v") });
+            var json = StraitJson.Serialize(new[] { Kv("k", s), Kv(s, "v") });
             using var doc = JsonDocument.Parse(json);
             Assert.Equal(s, doc.RootElement.GetProperty("k").GetString());
             Assert.Equal("v", doc.RootElement.GetProperty(s).GetString());
-            Assert.Equal(s, ((Dictionary<string, object?>)BridgeJson.Parse(json)!)["k"]);
+            Assert.Equal(s, ((Dictionary<string, object?>)StraitJson.Parse(json)!)["k"]);
         }
 
         [Fact]
         public void LoneSurrogatesAreEscaped()
         {
-            var json = BridgeJson.Serialize(new[] { Kv("k", "a\uD800b\uDC00c") });
+            var json = StraitJson.Serialize(new[] { Kv("k", "a\uD800b\uDC00c") });
             Assert.Equal("{\"k\":\"a\\ud800b\\udc00c\"}", json);
         }
 
         [Fact]
         public void NumbersBoolsNullsAndOmission()
         {
-            var json = BridgeJson.Serialize(new[]
+            var json = StraitJson.Serialize(new[]
             {
                 Kv("i", 411), Kv("l", 1234567890123L), Kv("d", 2.625), Kv("w", 3.0), Kv("neg", -0.5),
                 Kv("nan", double.NaN), Kv("t", true), Kv("f", false), Kv("skip", null),
@@ -55,7 +55,7 @@ namespace Bridge.Tests
         [Fact]
         public void ParsesEngineResponses()
         {
-            var o = BridgeJson.ParseObjectOrEmpty(
+            var o = StraitJson.ParseObjectOrEmpty(
                 " {\"matched\" : true, \"longUrl\":\"https:\\/\\/a.b\\/p?x=1\", \"n\": -1.5e2, \"z\":null,"
                 + " \"arr\":[1,{\"a\":[]}], \"u\":\"\\u00e9\\ud83d\\ude00\", \"matched\":false } ");
             Assert.Equal(false, o["matched"]); // duplicate keys: last wins
@@ -79,15 +79,15 @@ namespace Bridge.Tests
         [InlineData("{\"a\":1} x")]
         public void BadOrNonObjectBodies_BecomeEmpty(string text)
         {
-            Assert.Empty(BridgeJson.ParseObjectOrEmpty(text));
+            Assert.Empty(StraitJson.ParseObjectOrEmpty(text));
         }
 
         [Fact]
         public void DeepNestingIsRejectedNotStackOverflow()
         {
             var deep = new string('[', 10_000) + new string(']', 10_000);
-            Assert.Throws<FormatException>(() => BridgeJson.Parse(deep));
-            Assert.Empty(BridgeJson.ParseObjectOrEmpty("{\"a\":" + deep + "}"));
+            Assert.Throws<FormatException>(() => StraitJson.Parse(deep));
+            Assert.Empty(StraitJson.ParseObjectOrEmpty("{\"a\":" + deep + "}"));
         }
     }
 }

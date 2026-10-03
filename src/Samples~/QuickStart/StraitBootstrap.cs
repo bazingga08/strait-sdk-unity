@@ -4,22 +4,22 @@
 // Install Referrer — see "Device fields" and "Play Install Referrer" in the README.
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Bridge;
+using Strait;
 using UnityEngine;
 
-public class BridgeBootstrap : MonoBehaviour
+public class StraitBootstrap : MonoBehaviour
 {
-    [Tooltip("Dashboard → Get started → Publishable key (bk_pub_live_…). Never the secret key.")]
-    public string publishableKey = "bk_pub_live_…";
+    [Tooltip("Dashboard → Get started → Publishable key (st_pub_live_…). Never the secret key.")]
+    public string publishableKey = "st_pub_live_…";
     [Tooltip("Your link host, e.g. https://go.yourbrand.com")]
     public string endpoint = "https://go.yourbrand.com";
 
-    public static BridgeClient Client { get; private set; }
+    public static StraitClient Client { get; private set; }
 
     async void Start()
     {
         DontDestroyOnLoad(gameObject);
-        Client = new BridgeClient(new BridgeConfig
+        Client = new StraitClient(new StraitConfig
         {
             PublishableKey = publishableKey,
             Endpoint = endpoint,
